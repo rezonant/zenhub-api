@@ -13,6 +13,28 @@ export interface ReleaseReport {
     repositories?: number[];
 }
 
+export interface PlusOne {
+    created_at: string;
+}
+
+export interface IssueData {
+    plus_ones: PlusOne[];
+    estimate: Estimate;
+    is_epic: boolean;
+    pipelines: PipelinePosition[];
+    pipeline: PipelinePosition;
+}
+
+export interface PipelinePosition {
+    name: string;
+    pipeline_id: string;
+    workspace_id: string;
+}
+
+export interface Estimate {
+    value: number;
+}
+
 export class ZenHub {
     constructor(readonly apiKey: string) { }
     
@@ -37,7 +59,7 @@ export class ZenHub {
         return <ResponseT>await response.json();
     }
     
-    getIssueData(repo_id: number, issue_number: number) {
+    getIssueData(repo_id: number, issue_number: number): Promise<IssueData> {
         return this.apiCall('GET', `/repositories/${repo_id}/issues/${issue_number}`)
     }
     
