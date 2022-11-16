@@ -1,31 +1,31 @@
 {
-  "name": "zenhub-api",
-  "version": "0.2.0",
-  "description": "Wrapper for zenhub api",
-  "main": "src/index.js",
+  "name": "@rezonant/zenhub-api",
+  "version": "1.0.0",
+  "description": "ZenHub REST API",
+  "main": "dist/index.js",
   "dependencies": {
-    "debug": "^2.6.3",
-    "request": "^2.81.0",
-    "request-promise-native": "^1.0.3"
+    "node-fetch": "^3.3.0"
   },
   "keywords": [
     "zenhub",
     "zenhub-api"
   ],
   "devDependencies": {
-    "mocha": "^3.2.0"
+    "@types/node": "^18.11.9",
+    "typescript": "^4.9.3"
   },
   "scripts": {
-    "test": "./node_modules/.bin/mocha test/index.js"
+    "build": "tsc -b",
+    "test": "npm run build && node dist/test/test.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Webini/zenhub-api.git"
+    "url": "git+https://github.com/rezonant/zenhub-api.git"
   },
-  "author": "GASPARINI Nicolas",
-  "license": "ISC",
+  "author": "William Lahti, GASPARINI Nicolas",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Webini/zenhub-api/issues"
+    "url": "https://github.com/rezonant/zenhub-api/issues"
   },
-  "homepage": "https://github.com/Webini/zenhub-api#readme"
+  "homepage": "https://github.com/rezonant/zenhub-api#readme"
 }
