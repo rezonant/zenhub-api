@@ -16,7 +16,8 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "test": "npm run build && node dist/test/test.js"
+    "test": "exit 0",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
