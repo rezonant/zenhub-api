@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "ZenHub REST API",
   "main": "dist/index.js",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "node-fetch": "^3.3.0"
   },
