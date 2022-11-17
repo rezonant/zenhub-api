@@ -35,6 +35,23 @@ export interface Estimate {
     value: number;
 }
 
+export interface EpicData {
+    total_epic_estimates: Estimate;
+    estimate: Estimate;
+    pipeline: PipelinePosition;
+    pipelines: PipelinePosition[];
+    issues: EpicIssue[];
+}
+
+export interface EpicIssue {
+    issue_number: number;
+    is_epic: boolean;
+    repo_id: number;
+    estimate: Estimate;
+    pipelines: PipelinePosition[];
+    pipeline: PipelinePosition;
+}
+
 export class ZenHub {
     constructor(readonly apiKey: string) { }
     
@@ -75,7 +92,7 @@ export class ZenHub {
         return this.apiCall('GET', `/repositories/${repo_id}/epics`)
     }
     
-    getEpicData(repo_id: number, epic_id: number) {
+    getEpicData(repo_id: number, epic_id: number): Promise<EpicData> {
         return this.apiCall('GET', `/repositories/${repo_id}/epics/${epic_id}`)
     }
     
