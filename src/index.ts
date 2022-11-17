@@ -71,7 +71,7 @@ export class ZenHub {
         });
         
         if (response.status >= 400)
-        throw new Error(`ZenHub: Error during ${method} ${url}: Status ${response.status}`);
+            throw new Error(`ZenHub: Error during ${method} ${url}: Status ${response.status}, body: '${await response.text()}'`);
         
         return <ResponseT>await response.json();
     }
