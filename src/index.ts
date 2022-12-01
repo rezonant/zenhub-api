@@ -72,11 +72,14 @@ export interface Board {
 export class ZenHub {
     constructor(readonly apiKey: string) { }
     
+    graphqlKey: string;
+
     /**
      * The ZenHub API endpoint. Defaults tos 'https://api.zenhub.com'
      */
     endpoint: string = 'https://api.zenhub.com';
-    
+    graphqlEndpoint: string = 'https://api.zenhub.com/public/graphql';
+
     /**
      * Amount of times to retry a call when rate limited before giving up.
      */
@@ -87,7 +90,23 @@ export class ZenHub {
      */
     callsPerformed = 0;
 
-    async apiCall<BodyT = any, ResponseT = any>(method: string, url: string, body?: BodyT, retryCount = 0): Promise<ResponseT> {
+    async graphql<T>(query: string): Promise<T> {
+        let response = await fetch(this.graphqlEndpoint, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'authorization': `Bearer ${this.graphqlKey}`
+            },
+            body: JSON.stringify({ query })
+        })
+
+        if (response.status >= 400)
+            throw new Error(`GraphQL query '${query}' failed: status ${response.status}. Response: '${await response.text()}'`);
+
+        return await response.json();
+    }
+
+    async restCall<BodyT = any, ResponseT = any>(method: string, url: string, body?: BodyT, retryCount = 0): Promise<ResponseT> {
         this.callsPerformed += 1;
         let response = await fetch(`${this.endpoint}${url}`, {
             headers: {
@@ -110,7 +129,7 @@ export class ZenHub {
                 if (!isNaN(diff)) {
                     console.log(`[ZenHub] Waiting ${diff}ms to retry.`);
                     await new Promise(r => setTimeout(r, diff));
-                    return await this.apiCall(method, url, body, retryCount + 1);
+                    return await this.restCall(method, url, body, retryCount + 1);
                 }
             }
         }
@@ -122,72 +141,72 @@ export class ZenHub {
     }
     
     getIssueData(repo_id: number, issue_number: number): Promise<IssueData> {
-        return this.apiCall('GET', `/p1/repositories/${repo_id}/issues/${issue_number}`)
+        return this.restCall('GET', `/p1/repositories/${repo_id}/issues/${issue_number}`)
     }
     
     getIssueEvents(repo_id: number, issue_number: number) {
-        return this.apiCall('GET', `/p1/repositories/${repo_id}/issues/${issue_number}/events`)
+        return this.restCall('GET', `/p1/repositories/${repo_id}/issues/${issue_number}/events`)
     }
     
     getBoardForWorkspace(workspace_id: number, repo_id: number): Promise<Board> {
-        return this.apiCall('GET', `/p2/workspaces/${workspace_id}/repositories/${repo_id}/board`)
+        return this.restCall('GET', `/p2/workspaces/${workspace_id}/repositories/${repo_id}/board`)
     }
     
     getOldestBoardForRepo(repo_id: number): Promise<Board> {
-        return this.apiCall('GET', `/p1/repositories/${repo_id}/board`);
+        return this.restCall('GET', `/p1/repositories/${repo_id}/board`);
     }
     
     getWorkspaces(repo_id: number): Promise<Workspace[]> {
-        return this.apiCall('GET', `/p2/repositories/${repo_id}/workspaces`);
+        return this.restCall('GET', `/p2/repositories/${repo_id}/workspaces`);
     }
 
     getEpics(repo_id: number) {
-        return this.apiCall('GET', `/p1/repositories/${repo_id}/epics`)
+        return this.restCall('GET', `/p1/repositories/${repo_id}/epics`)
     }
     
     getEpicData(repo_id: number, epic_id: number): Promise<EpicData> {
-        return this.apiCall('GET', `/p1/repositories/${repo_id}/epics/${epic_id}`)
+        return this.restCall('GET', `/p1/repositories/${repo_id}/epics/${epic_id}`)
     }
     
     changePipeline(repo_id: number, issue_number: number, pipeline_id: string, position: string | number) {
-        return this.apiCall('POST', `/p1/repositories/${repo_id}/issues/${issue_number}/moves`, {
+        return this.restCall('POST', `/p1/repositories/${repo_id}/issues/${issue_number}/moves`, {
             pipeline_id, position
         });
     }
     
     setEstimate(repo_id: number, issue_number: number, estimate: number) {
-        return this.apiCall('PUT', `/p1/repositories/${repo_id}/issues/${issue_number}/estimate`, { estimate })
+        return this.restCall('PUT', `/p1/repositories/${repo_id}/issues/${issue_number}/estimate`, { estimate })
     }
     
     convertToEpic(repo_id: number, issue_number: number, issues: IssueRef[]) {
-        return this.apiCall('POST', `/p1/repositories/${repo_id}/issues/${issue_number}/convert_to_epic`, { issues })
+        return this.restCall('POST', `/p1/repositories/${repo_id}/issues/${issue_number}/convert_to_epic`, { issues })
     }
     
     convertToIssue(repo_id: number, issue_number: number) {
-        return this.apiCall('POST', `/p1/repositories/${repo_id}/epics/${issue_number}/convert_to_issue`)
+        return this.restCall('POST', `/p1/repositories/${repo_id}/epics/${issue_number}/convert_to_issue`)
     }
     
     addToEpic(repo_id: number, epic_number: number, issues: IssueRef[]) {
-        return this.apiCall('POST', `/p1/repositories/${repo_id}/epics/${epic_number}/update_issues`, { add_issues: issues });
+        return this.restCall('POST', `/p1/repositories/${repo_id}/epics/${epic_number}/update_issues`, { add_issues: issues });
     }
 
     removeFromEpic(repo_id: number, epic_number: number, issues: IssueRef[]) {
-        return this.apiCall('POST', `/p1/repositories/${repo_id}/epics/${epic_number}/update_issues`, { remove_issues: issues })
+        return this.restCall('POST', `/p1/repositories/${repo_id}/epics/${epic_number}/update_issues`, { remove_issues: issues })
     }
     
     createReleaseReport(repo_id: number, report: ReleaseReport) {
-        return this.apiCall('POST', `/p1/repositories/${repo_id}/reports/release`, report)
+        return this.restCall('POST', `/p1/repositories/${repo_id}/reports/release`, report)
     }
     
     getReleaseReport(release_id: number): Promise<ReleaseReport> {
-        return this.apiCall('GET', `/p1/reports/release/${release_id}`)
+        return this.restCall('GET', `/p1/reports/release/${release_id}`)
     }
     
     getReleaseReportsForRepo(repo_id: number): Promise<ReleaseReport[]> {
-        return this.apiCall('GET', `/p1/repositories/${repo_id}/reports/releases`)
+        return this.restCall('GET', `/p1/repositories/${repo_id}/reports/releases`)
     }
     
     editReleaseReport(release_id: number, report: Partial<ReleaseReport>): Promise<ReleaseReport> {
-        return this.apiCall('PATCH', `/p1/reports/release/${release_id}`, report);
+        return this.restCall('PATCH', `/p1/reports/release/${release_id}`, report);
     }
 }
