@@ -1,4 +1,7 @@
 import fetch from 'node-fetch';
+export * from './gql';
+import * as gql from './gql';
+import * as graphql from 'graphql';
 
 export interface IssueRef {
     repo_id: number;
@@ -69,6 +72,15 @@ export interface Board {
     pipelines: Pipeline[];
 }
 
+export interface Sprint {
+    id: string;
+    startAt: string;
+    endAt: string;
+    name: string;
+    totalPoints: number;
+    completedPoints: number;
+}
+
 export class ZenHub {
     constructor(readonly apiKey: string) { }
     
@@ -90,20 +102,24 @@ export class ZenHub {
      */
     callsPerformed = 0;
 
-    async graphql<T>(query: string): Promise<T> {
+    async graphql<T>(query: string, variables: Record<string,any>): Promise<gql.Query> {
         let response = await fetch(this.graphqlEndpoint, {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
                 'authorization': `Bearer ${this.graphqlKey}`
             },
-            body: JSON.stringify({ query })
+            body: JSON.stringify({ query, variables })
         })
 
         if (response.status >= 400)
             throw new Error(`GraphQL query '${query}' failed: status ${response.status}. Response: '${await response.text()}'`);
 
-        return await response.json();
+        let result = <graphql.ExecutionResult<gql.Query>>await response.json();
+
+        if (result.errors)
+            throw new Error(`Error during GraphQL '${query.replace(/\r?\n/g, ' ').replace(/  +/g, ' ').trim()}' with variables ${JSON.stringify(variables)}: ${JSON.stringify(result.errors)}`);
+        return result.data;
     }
 
     async restCall<BodyT = any, ResponseT = any>(method: string, url: string, body?: BodyT, retryCount = 0): Promise<ResponseT> {
@@ -137,7 +153,16 @@ export class ZenHub {
         if (response.status >= 400)
             throw new Error(`ZenHub: Error during ${method} ${url}: Status ${response.status}, body: '${await response.text()}'`);
         
-        return <ResponseT>await response.json();
+        let text = await response.text();
+
+        if (text === '')
+            return undefined;
+        
+        try {
+            return  <ResponseT>JSON.parse(text);
+        } catch (e) {
+            throw new Error(`[Zenhub] Failed to parse response to ${method} '${url}': ${e.message}. Body was '${text}'`);
+        }
     }
     
     getIssueData(repo_id: number, issue_number: number): Promise<IssueData> {
@@ -148,7 +173,7 @@ export class ZenHub {
         return this.restCall('GET', `/p1/repositories/${repo_id}/issues/${issue_number}/events`)
     }
     
-    getBoardForWorkspace(workspace_id: number, repo_id: number): Promise<Board> {
+    getBoardForWorkspace(workspace_id: string, repo_id: number): Promise<Board> {
         return this.restCall('GET', `/p2/workspaces/${workspace_id}/repositories/${repo_id}/board`)
     }
     
@@ -163,7 +188,57 @@ export class ZenHub {
     getEpics(repo_id: number) {
         return this.restCall('GET', `/p1/repositories/${repo_id}/epics`)
     }
+
+    async addIssuesToSprint(sprintIds: string[], issueIds: string[]) {
+        await this.graphql(`
+            mutation addIssuesToSprints($issueIds: [ID!]!, $sprintIds: [ID!]!) {
+                addIssuesToSprints(input: {
+                    issueIds: $issueIds,
+                    sprintIds: $sprintIds
+                }) {
+                    sprintIssues {
+                        id
+                    }
+                }
+            }
+        `, {
+            issueIds,
+            sprintIds
+        })
+    }
     
+    async getActiveSprint(workspace_id: string): Promise<Sprint> {
+        let result = await this.graphql(`
+          query getWorkspace($workspace_id: ID!) {
+            workspace(id: $workspace_id) {
+              id
+              activeSprint {
+                id
+                startAt
+                endAt
+                name
+                totalPoints
+                completedPoints
+              }
+            }
+          }
+        `, { workspace_id });
+
+        return <Sprint>result.workspace.activeSprint;
+    }
+    
+    async getZenhubIssueID(repo_id: number, issue_number: number) {
+        let result = await this.graphql(`
+            query($repo_id: Int!, $issue_number: Int!) {
+                issueByInfo(repositoryGhId: $repo_id, issueNumber: $issue_number) {
+                    id
+                }
+            }
+        `, { repo_id, issue_number })
+
+        return result.issueByInfo.id;
+    }
+
     getEpicData(repo_id: number, epic_id: number): Promise<EpicData> {
         return this.restCall('GET', `/p1/repositories/${repo_id}/epics/${epic_id}`)
     }
